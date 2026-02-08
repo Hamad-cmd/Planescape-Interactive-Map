@@ -1,0 +1,2190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Sigil Map</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #2c2c2c;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ffd700;
+            margin: 15px 0;
+            font-size: 24px;
+        }
+        
+        .map-switcher {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .map-switch-btn {
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+            border: 2px solid #555;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .map-switch-btn:hover {
+            background-color: #4a4a4a;
+            border-color: #ffd700;
+            transform: translateY(-2px);
+        }
+        
+        .map-switch-btn.active {
+            background-color: #ffd700;
+            color: #2c2c2c;
+            border-color: #ffd700;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+        }
+        
+        .main-content {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .map-viewport {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+            touch-action: none;
+        }
+        
+        .map-viewport:active {
+            cursor: grabbing;
+        }
+        
+        .map-container {
+            position: absolute;
+            transform-origin: 0 0;
+            transition: none;
+        }
+        
+        .map-image {
+            display: block;
+            user-select: none;
+            pointer-events: none;
+        }
+        
+        .landmark-dot {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            background-color: #ff4444;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(255, 68, 68, 0.8);
+            animation: pulse 2s infinite;
+            pointer-events: auto;
+            z-index: 10;
+        }
+        
+        .landmark-dot:hover {
+            width: 34px;
+            height: 34px;
+            background-color: #ff6666;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 1);
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 10px rgba(255, 68, 68, 0.8);
+            }
+            50% {
+                box-shadow: 0 0 20px rgba(255, 68, 68, 1);
+            }
+        }
+        
+        .landmark-label {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #ffd700;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            transform: translate(-50%, -40px);
+            border: 1px solid #ffd700;
+            z-index: 11;
+        }
+        
+        .landmark-dot:hover + .landmark-label {
+            opacity: 1;
+        }
+        
+        .instructions {
+            background-color: #3a3a3a;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #ffd700;
+        }
+        
+        .instructions h2 {
+            margin-top: 0;
+            color: #ffd700;
+        }
+        
+        .instructions ul {
+            line-height: 1.8;
+        }
+        
+        .add-landmark-section {
+            background-color: #3a3a3a;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #4444ff;
+        }
+        
+        .add-landmark-section h2 {
+            margin-top: 0;
+            color: #4499ff;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #4499ff;
+        }
+        
+        .form-group input {
+            width: 100%;
+            max-width: 300px;
+            padding: 8px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background-color: #2c2c2c;
+            color: #fff;
+        }
+        
+        .btn {
+            background-color: #4499ff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .btn:hover {
+            background-color: #3377dd;
+        }
+        
+        .edit-mode-btn {
+            background-color: #ffd700;
+            color: #2c2c2c;
+            margin-bottom: 20px;
+        }
+        
+        .edit-mode-btn:hover {
+            background-color: #ffed4e;
+        }
+        
+        .edit-mode-active {
+            background-color: #44ff44;
+        }
+        
+        .edit-mode-active:hover {
+            background-color: #55ff55;
+        }
+        
+        /* Sidebar styles */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: -450px;
+            width: 400px;
+            height: 100vh;
+            background-color: #1a1a1a;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+        
+        .sidebar.open {
+            right: 0;
+        }
+        
+        .sidebar-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #ffd700;
+            color: #2c2c2c;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 1002;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        
+        .sidebar-toggle.sidebar-open {
+            right: 420px;
+        }
+        
+        .sidebar-toggle:hover {
+            background-color: #ffed4e;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        }
+        
+        .sidebar h2 {
+            color: #ffd700;
+            margin-top: 0;
+            border-bottom: 2px solid #ffd700;
+            padding-bottom: 10px;
+        }
+        
+        .sidebar-section {
+            margin-bottom: 25px;
+        }
+        
+        /* Zoom controls */
+        .zoom-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 90;
+            transition: right 0.3s ease;
+        }
+        
+        .zoom-controls.sidebar-open {
+            right: 420px;
+        }
+        
+        .zoom-btn {
+            width: 45px;
+            height: 45px;
+            background-color: #3a3a3a;
+            color: #fff;
+            border: 2px solid #ffd700;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 24px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        
+        .zoom-btn:hover {
+            background-color: #ffd700;
+            color: #2c2c2c;
+            transform: scale(1.1);
+        }
+        
+        .zoom-level {
+            background-color: #3a3a3a;
+            color: #ffd700;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            border: 2px solid #ffd700;
+            font-weight: bold;
+        }
+
+        /* Mobile-friendly adjustments */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 18px;
+                margin: 10px 0;
+            }
+
+            .sidebar {
+                width: 100vw;
+                right: -100vw;
+                padding: 16px;
+            }
+
+            .sidebar-toggle {
+                top: 10px;
+                right: 10px;
+                padding: 10px 14px;
+                font-size: 14px;
+            }
+
+            .sidebar-toggle.sidebar-open {
+                right: 10px;
+            }
+
+            .zoom-controls {
+                right: 10px;
+                bottom: 10px;
+            }
+
+            .zoom-controls.sidebar-open {
+                right: 10px;
+            }
+
+            .zoom-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+
+            .zoom-level {
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+
+            .landmark-dot {
+                width: 22px;
+                height: 22px;
+            }
+
+            .landmark-dot:hover {
+                width: 26px;
+                height: 26px;
+            }
+
+            .modal-content {
+                width: 95%;
+                height: 90vh;
+            }
+
+            .modal-header {
+                padding: 16px;
+            }
+
+            .btn,
+            .map-switch-btn {
+                font-size: 14px;
+                padding: 10px 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar {
+                padding: 12px;
+            }
+
+            .landmark-label {
+                font-size: 11px;
+            }
+
+            .modal-header h2 {
+                font-size: 16px;
+            }
+        }
+        
+        /* Modal Overlay Styles */
+        .location-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.95);
+            z-index: 2000;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .location-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        .modal-content {
+            background-color: #1a1a1a;
+            width: 90%;
+            max-width: 1200px;
+            height: 85vh;
+            border-radius: 15px;
+            box-shadow: 0 10px 50px rgba(255, 215, 0, 0.3);
+            border: 3px solid #ffd700;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-header {
+            background: linear-gradient(135deg, #2c2c2c 0%, #3a3a3a 100%);
+            padding: 25px 30px;
+            border-bottom: 2px solid #ffd700;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .modal-header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
+        }
+        
+        .modal-title {
+            color: #ffd700;
+            font-size: 32px;
+            margin: 0;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .modal-close {
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            font-size: 28px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(255, 68, 68, 0.3);
+        }
+        
+        .modal-close:hover {
+            background-color: #ff6666;
+            transform: rotate(90deg) scale(1.1);
+            box-shadow: 0 6px 15px rgba(255, 68, 68, 0.5);
+        }
+        
+        .delete-location-btn {
+            background-color: #ff8800;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .delete-location-btn:hover {
+            background-color: #ff4444;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(255, 68, 68, 0.4);
+        }
+        
+        .modal-body {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background-color: #2c2c2c;
+        }
+        
+        .modal-body::-webkit-scrollbar {
+            width: 12px;
+        }
+        
+        .modal-body::-webkit-scrollbar-track {
+            background: #1a1a1a;
+            border-radius: 6px;
+        }
+        
+        .modal-body::-webkit-scrollbar-thumb {
+            background: #ffd700;
+            border-radius: 6px;
+        }
+        
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: #ffed4e;
+        }
+        
+        .location-content {
+            color: #e0e0e0;
+            line-height: 1.8;
+            font-size: 16px;
+        }
+        
+        .location-content h2 {
+            color: #ffd700;
+            border-bottom: 2px solid #ffd700;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        
+        .location-content h3 {
+            color: #4499ff;
+            margin-top: 20px;
+        }
+        
+        .location-content p {
+            margin: 15px 0;
+        }
+        
+        .location-content ul, .location-content ol {
+            padding-left: 25px;
+            margin: 15px 0;
+        }
+        
+        .location-content li {
+            margin: 8px 0;
+        }
+        
+        .edit-content-btn {
+            background-color: #4499ff;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        
+        .edit-content-btn:hover {
+            background-color: #3377dd;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(68, 153, 255, 0.4);
+        }
+        
+        .content-editor {
+            width: 100%;
+            min-height: 400px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            border: 2px solid #4499ff;
+            border-radius: 0 0 8px 8px;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            overflow-y: auto;
+            max-height: 500px;
+        }
+        
+        .content-editor:focus {
+            outline: none;
+        }
+        
+        .content-editor[contenteditable="true"] {
+            cursor: text;
+        }
+        
+        /* Rich Text Editor Toolbar */
+        .editor-toolbar {
+            background-color: #3a3a3a;
+            border: 2px solid #4499ff;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            padding: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        .toolbar-btn {
+            background-color: #2c2c2c;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            min-width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .toolbar-btn:hover {
+            background-color: #4499ff;
+            border-color: #4499ff;
+            transform: translateY(-1px);
+        }
+        
+        .toolbar-btn.active {
+            background-color: #ffd700;
+            color: #2c2c2c;
+            border-color: #ffd700;
+        }
+        
+        .toolbar-separator {
+            width: 1px;
+            height: 30px;
+            background-color: #555;
+            margin: 0 5px;
+        }
+        
+        .toolbar-select {
+            background-color: #2c2c2c;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .toolbar-select:hover {
+            border-color: #4499ff;
+        }
+        
+        .toolbar-select:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+        
+        .color-picker {
+            width: 35px;
+            height: 35px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #2c2c2c;
+        }
+        
+        .color-picker::-webkit-color-swatch-wrapper {
+            padding: 2px;
+        }
+        
+        .color-picker::-webkit-color-swatch {
+            border: none;
+            border-radius: 3px;
+        }
+        
+        .editor-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .save-content-btn {
+            background-color: #44ff44;
+            color: #1a1a1a;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .save-content-btn:hover {
+            background-color: #55ff55;
+            transform: translateY(-2px);
+        }
+        
+        .cancel-edit-btn {
+            background-color: #ff4444;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .cancel-edit-btn:hover {
+            background-color: #ff6666;
+            transform: translateY(-2px);
+        }
+        
+        /* Section Editor Styles */
+        .section-editor {
+            margin-bottom: 20px;
+        }
+        
+        .section-block {
+            background-color: #1a1a1a;
+            border: 2px solid #4499ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .section-block-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .section-controls {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .move-section-btn {
+            background-color: #4499ff;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            font-weight: bold;
+        }
+        
+        .move-section-btn:hover {
+            background-color: #3377dd;
+            transform: scale(1.05);
+        }
+        
+        .move-section-btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        .move-section-btn:disabled:hover {
+            transform: none;
+        }
+        
+        .section-title-input {
+            flex: 1;
+            background-color: #2c2c2c;
+            color: #ffd700;
+            border: 1px solid #555;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .section-title-input:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+        
+        .remove-section-btn {
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        
+        .remove-section-btn:hover {
+            background-color: #ff6666;
+            transform: scale(1.05);
+        }
+        
+        .section-content-input {
+            width: 100%;
+            min-height: 150px;
+            background-color: #2c2c2c;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: Arial, sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            resize: vertical;
+        }
+        
+        .section-content-input:focus {
+            outline: none;
+            border-color: #4499ff;
+        }
+        
+        .add-new-section-btn {
+            background-color: #44ff44;
+            color: #1a1a1a;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        
+        .add-new-section-btn:hover {
+            background-color: #55ff55;
+            transform: translateY(-2px);
+        }
+        
+        /* Landmarks List */
+        .landmarks-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .landmark-item {
+            background-color: #2c2c2c;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #ffd700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .landmark-color-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            flex-shrink: 0;
+        }
+        
+        .landmark-item-actions {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        .edit-landmark-color-btn {
+            background-color: #4499ff;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .edit-landmark-color-btn:hover {
+            background-color: #3377dd;
+            transform: scale(1.05);
+        }
+        
+        /* Collapsible Sections (Wikipedia-style) */
+        .collapsible-section {
+            margin: 20px 0;
+            border: 1px solid #444;
+            border-radius: 6px;
+            overflow: hidden;
+            background-color: #2c2c2c;
+        }
+        
+        .collapsible-header {
+            background-color: #3a3a3a;
+            padding: 15px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+            transition: background-color 0.3s ease;
+            user-select: none;
+        }
+        
+        .collapsible-header:hover {
+            background-color: #454545;
+        }
+        
+        .collapsible-header h2,
+        .collapsible-header h3 {
+            margin: 0;
+            color: #ffd700;
+            font-size: 18px;
+            flex: 1;
+        }
+        
+        .collapsible-toggle {
+            font-size: 24px;
+            color: #ffd700;
+            transition: transform 0.3s ease;
+            font-weight: bold;
+            width: 30px;
+            text-align: center;
+        }
+        
+        .collapsible-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .collapsible-content {
+            padding: 20px;
+            background-color: #2c2c2c;
+            max-height: none;
+            overflow: visible;
+            transition: max-height 0.4s ease, padding 0.4s ease;
+        }
+        
+        .collapsible-content.collapsed {
+            max-height: 0;
+            padding: 0 20px;
+            overflow: hidden;
+        }
+        
+        .collapsible-content p:first-child {
+            margin-top: 0;
+        }
+        
+        .collapsible-content p:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* Add Section Button */
+        .add-section-btn {
+            background-color: #4499ff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .add-section-btn:hover {
+            background-color: #3377dd;
+            transform: translateY(-2px);
+        }
+        
+        .landmark-item-name {
+            flex: 1;
+            color: #e0e0e0;
+            font-weight: bold;
+        }
+        
+        .landmark-item-id {
+            color: #888;
+            font-size: 12px;
+        }
+        
+        .delete-landmark-btn {
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .delete-landmark-btn:hover {
+            background-color: #ff6666;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Interactive Map Explorer 🗺️</h1>
+        
+        <div class="main-content">
+            <div class="map-viewport" id="mapViewport">
+                <div class="map-container" id="mapContainer">
+                    <img src="Sigil Map.jpeg" alt="Sigil Map" class="map-image" id="mapImage">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Location Modal -->
+    <div class="location-modal" id="locationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <h1 class="modal-title" id="modalTitle">Location Name</h1>
+                    <button class="delete-location-btn" id="deleteLocationBtn" onclick="deleteCurrentLocation()">
+                        🗑️ Delete Location
+                    </button>
+                </div>
+                <button class="modal-close" onclick="closeLocationModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <button class="edit-content-btn" id="editToggleBtn" onclick="toggleContentEdit()">
+                    ✏️ Edit Content
+                </button>
+                <div class="location-content" id="locationContent">
+                    <!-- Content will be loaded here -->
+                </div>
+                <div id="contentEditor" style="display: none;">
+                    <div class="section-editor" id="sectionEditor">
+                        <!-- Sections will be added here dynamically -->
+                    </div>
+                    <button class="add-new-section-btn" onclick="addSectionBlock()">➕ Add New Section</button>
+                    <div class="editor-actions">
+                        <button class="save-content-btn" onclick="saveLocationContent()">💾 Save</button>
+                        <button class="cancel-edit-btn" onclick="cancelContentEdit()">✖ Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar Toggle Button -->
+    <button class="sidebar-toggle" onclick="toggleSidebar()">☰ Menu</button>
+    
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-section">
+            <h2>🗺️ Select Map</h2>
+            <div class="map-switcher">
+                <button class="map-switch-btn active" id="sigilMapBtn" onclick="switchMap('sigil')">Sigil Map</button>
+                <button class="map-switch-btn" id="outlandsMapBtn" onclick="switchMap('outlands')">Outlands Map</button>
+            </div>
+        </div>
+        
+        <div class="sidebar-section">
+            <h2>📖 Instructions</h2>
+            <ul>
+                <li><strong>Scroll</strong> your mouse wheel to zoom in/out</li>
+                <li><strong>Click and drag</strong> to pan around the map</li>
+                <li><strong>Hover</strong> over red dots to see landmark names</li>
+                <li><strong>Click</strong> on dots to view detailed information about that location</li>
+                <li><strong>Edit Mode:</strong> Enable below to add new landmarks by clicking on the map</li>
+            </ul>
+        </div>
+        
+        <div class="sidebar-section">
+            <h2>✏️ Edit Mode</h2>
+            <button id="editModeBtn" class="btn edit-mode-btn" onclick="toggleEditMode()">
+                Enable Edit Mode
+            </button>
+        </div>
+        
+        <div class="sidebar-section" id="addLandmarkSection" style="display: none;">
+            <h2>Add New Landmark</h2>
+            <p>Click position: <span id="clickPosition">Not set</span></p>
+            <div class="form-group">
+                <label for="landmarkName">Landmark Name:</label>
+                <input type="text" id="landmarkName" placeholder="Enter landmark name">
+            </div>
+            <div class="form-group">
+                <label for="documentPage">Landmark ID (unique):</label>
+                <input type="text" id="documentPage" placeholder="e.g., LadysWard or Armoury">
+            </div>
+            <div class="form-group">
+                <label for="landmarkColor">Dot Color:</label>
+                <input type="color" id="landmarkColor" value="#ff4444" style="width: 100px; height: 35px; cursor: pointer; border: 1px solid #555; border-radius: 4px;">
+            </div>
+            <button class="btn" onclick="saveLandmark()">Save Landmark</button>
+            <button class="btn" onclick="cancelLandmark()" style="background-color: #ff4444;">Cancel</button>
+        </div>
+        
+        <div class="sidebar-section">
+            <h2>🗺️ Manage Landmarks</h2>
+            <div class="landmarks-list" id="landmarksList">
+                <p style="color: #888;">No landmarks added yet.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Zoom Controls -->
+    <div class="zoom-controls">
+        <button class="zoom-btn" onclick="zoomIn()">+</button>
+        <div class="zoom-level" id="zoomLevel">100%</div>
+        <button class="zoom-btn" onclick="zoomOut()">−</button>
+        <button class="zoom-btn" onclick="resetZoom()" style="font-size: 18px;">⟲</button>
+    </div>
+
+    <script>
+        let editMode = false;
+        let tempClickPosition = null;
+        let currentZoom = 1;
+        let translateX = 0;
+        let translateY = 0;
+        const zoomStep = 0.1;
+        const minZoom = 0.3;
+        const maxZoom = 4;
+        let isPanning = false;
+        let startX = 0;
+        let startY = 0;
+        let currentLocationId = null;
+        let isEditingContent = false;
+        let originalContent = '';
+        let currentMap = 'sigil';
+
+        // Map-specific data storage
+        let mapData = {
+            sigil: {
+                landmarks: [],
+                contents: {},
+                imageSrc: 'Sigil Map.jpeg'
+            },
+            outlands: {
+                landmarks: [],
+                contents: {},
+                imageSrc: 'Outlands Map.jpeg'
+            }
+        };
+        
+        // Shortcuts for current map data
+        let landmarks = [];
+        let locationContents = {};
+
+        // Load saved data from localStorage
+        function loadAllMapsData() {
+            // Load Sigil Map data
+            const sigilLandmarks = localStorage.getItem('sigilMapLandmarks');
+            if (sigilLandmarks) {
+                mapData.sigil.landmarks = JSON.parse(sigilLandmarks);
+            } else {
+                // Add default example landmark for Sigil if no landmarks exist
+                mapData.sigil.landmarks = [
+                    {
+                        name: "The Lady's Ward",
+                        x: "50",
+                        y: "30",
+                        reference: "LadysWard"
+                    }
+                ];
+            }
+            
+            const sigilContents = localStorage.getItem('sigilMapContents');
+            if (sigilContents) {
+                mapData.sigil.contents = JSON.parse(sigilContents);
+            }
+            
+            // Load Outlands Map data
+            const outlandsLandmarks = localStorage.getItem('outlandsMapLandmarks');
+            if (outlandsLandmarks) {
+                mapData.outlands.landmarks = JSON.parse(outlandsLandmarks);
+            }
+            
+            const outlandsContents = localStorage.getItem('outlandsMapContents');
+            if (outlandsContents) {
+                mapData.outlands.contents = JSON.parse(outlandsContents);
+            }
+            
+            // Load current map
+            loadCurrentMapData();
+        }
+        
+        // Load current map's data into working variables
+        function loadCurrentMapData() {
+            landmarks = mapData[currentMap].landmarks;
+            locationContents = mapData[currentMap].contents;
+            renderLandmarks();
+        }
+
+        // Save landmarks to localStorage
+        function saveLandmarksToStorage() {
+            mapData[currentMap].landmarks = landmarks;
+            localStorage.setItem(currentMap + 'MapLandmarks', JSON.stringify(landmarks));
+        }
+        
+        // Save location contents to localStorage
+        function saveContentsToStorage() {
+            mapData[currentMap].contents = locationContents;
+            localStorage.setItem(currentMap + 'MapContents', JSON.stringify(locationContents));
+        }
+        
+        // Switch between maps
+        function switchMap(mapName) {
+            if (currentMap === mapName) return;
+            
+            // Check if editing content
+            if (isEditingContent) {
+                if (!confirm('You have unsaved changes. Are you sure you want to switch maps?')) {
+                    return;
+                }
+                cancelContentEdit();
+            }
+            
+            // Close modal if open
+            const modal = document.getElementById('locationModal');
+            if (modal.classList.contains('active')) {
+                modal.classList.remove('active');
+                document.body.style.overflow = 'auto';
+            }
+            
+            // Exit edit mode if active
+            if (editMode) {
+                toggleEditMode();
+            }
+            
+            // Update current map
+            currentMap = mapName;
+            
+            // Update map image
+            const mapImage = document.getElementById('mapImage');
+            mapImage.src = mapData[currentMap].imageSrc;
+            
+            // Load map data
+            loadCurrentMapData();
+            
+            // Reset zoom
+            resetZoom();
+            
+            // Update active button
+            document.getElementById('sigilMapBtn').classList.remove('active');
+            document.getElementById('outlandsMapBtn').classList.remove('active');
+            
+            if (mapName === 'sigil') {
+                document.getElementById('sigilMapBtn').classList.add('active');
+            } else {
+                document.getElementById('outlandsMapBtn').classList.add('active');
+            }
+        }
+
+        // Render all landmarks on the map
+        function renderLandmarks() {
+            // Remove existing custom landmarks
+            const existingDots = document.querySelectorAll('.landmark-dot.custom');
+            const existingLabels = document.querySelectorAll('.landmark-label.custom');
+            existingDots.forEach(dot => dot.remove());
+            existingLabels.forEach(label => label.remove());
+
+            // Add all landmarks
+            const mapContainer = document.getElementById('mapContainer');
+            landmarks.forEach((landmark, index) => {
+                const dot = document.createElement('div');
+                dot.className = 'landmark-dot custom';
+                dot.style.left = landmark.x + '%';
+                dot.style.top = landmark.y + '%';
+                
+                // Apply custom color if set, otherwise use default red
+                const color = landmark.color || '#ff4444';
+                dot.style.backgroundColor = color;
+                dot.style.boxShadow = `0 0 10px ${color}cc`;
+                
+                // Update hover color (lighter version)
+                dot.onmouseenter = function() {
+                    this.style.backgroundColor = lightenColor(color, 20);
+                    this.style.boxShadow = `0 0 20px ${color}`;
+                };
+                dot.onmouseleave = function() {
+                    this.style.backgroundColor = color;
+                    this.style.boxShadow = `0 0 10px ${color}cc`;
+                };
+                
+                dot.onclick = () => openLocationModal(landmark.reference, landmark.name);
+                
+                const label = document.createElement('div');
+                label.className = 'landmark-label custom';
+                label.style.left = landmark.x + '%';
+                label.style.top = landmark.y + '%';
+                label.textContent = landmark.name;
+                
+                mapContainer.appendChild(dot);
+                mapContainer.appendChild(label);
+            });
+            
+            // Update landmarks list in sidebar
+            updateLandmarksList();
+        }
+        
+        // Update landmarks list in sidebar
+        function updateLandmarksList() {
+            const listContainer = document.getElementById('landmarksList');
+            
+            if (landmarks.length === 0) {
+                listContainer.innerHTML = '<p style="color: #888;">No landmarks added yet.</p>';
+                return;
+            }
+            
+            listContainer.innerHTML = '';
+            landmarks.forEach((landmark, index) => {
+                const item = document.createElement('div');
+                item.className = 'landmark-item';
+                
+                // Color indicator
+                const colorIndicator = document.createElement('div');
+                colorIndicator.className = 'landmark-color-indicator';
+                colorIndicator.style.backgroundColor = landmark.color || '#ff4444';
+                
+                const info = document.createElement('div');
+                info.style.flex = '1';
+                
+                const name = document.createElement('div');
+                name.className = 'landmark-item-name';
+                name.textContent = landmark.name;
+                
+                const id = document.createElement('div');
+                id.className = 'landmark-item-id';
+                id.textContent = 'ID: ' + landmark.reference;
+                
+                info.appendChild(name);
+                info.appendChild(id);
+                
+                const actions = document.createElement('div');
+                actions.className = 'landmark-item-actions';
+                
+                const editColorBtn = document.createElement('button');
+                editColorBtn.className = 'edit-landmark-color-btn';
+                editColorBtn.textContent = '🎨';
+                editColorBtn.title = 'Change Color';
+                editColorBtn.onclick = () => editLandmarkColor(landmark.reference);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-landmark-btn';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.onclick = () => deleteLandmark(landmark.reference);
+                
+                actions.appendChild(editColorBtn);
+                actions.appendChild(deleteBtn);
+                
+                item.appendChild(colorIndicator);
+                item.appendChild(info);
+                item.appendChild(actions);
+                listContainer.appendChild(item);
+            });
+        }
+        
+        // Open location modal
+        function openLocationModal(locationId, locationName) {
+            currentLocationId = locationId;
+            const modal = document.getElementById('locationModal');
+            const title = document.getElementById('modalTitle');
+            const content = document.getElementById('locationContent');
+            const deleteBtn = document.getElementById('deleteLocationBtn');
+            
+            title.textContent = locationName;
+            
+            // All landmarks can be deleted
+            deleteBtn.style.display = 'flex';
+            
+            // Load content for this location or show default message
+            if (locationContents[locationId]) {
+                content.innerHTML = locationContents[locationId];
+            } else {
+                content.innerHTML = `
+                    <div class="collapsible-section">
+                        <div class="collapsible-header" onclick="toggleSection(this)">
+                            <h2>Welcome to ${locationName}</h2>
+                            <span class="collapsible-toggle">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <p><em>No content has been added yet. Click "Edit Content" to add information about this location.</em></p>
+                        </div>
+                    </div>
+                    <div class="collapsible-section">
+                        <div class="collapsible-header" onclick="toggleSection(this)">
+                            <h3>Getting Started</h3>
+                            <span class="collapsible-toggle">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <p>You can add sections for:</p>
+                            <ul>
+                                <li>Descriptions and lore</li>
+                                <li>Important NPCs</li>
+                                <li>Quests and storylines</li>
+                                <li>Notable locations within this area</li>
+                                <li>Any other relevant information</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Initialize collapsible sections (collapsed by default)
+            initializeCollapsibleSections(true);
+            
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        // Close location modal
+        function closeLocationModal() {
+            if (isEditingContent) {
+                if (!confirm('You have unsaved changes. Are you sure you want to close?')) {
+                    return;
+                }
+            }
+            
+            const modal = document.getElementById('locationModal');
+            modal.classList.remove('active');
+            document.body.style.overflow = 'auto';
+            
+            // Reset editing state
+            if (isEditingContent) {
+                cancelContentEdit();
+            }
+        }
+        
+        // Toggle collapsible section
+        function toggleSection(header) {
+            const content = header.nextElementSibling;
+            const toggle = header.querySelector('.collapsible-toggle');
+            
+            content.classList.toggle('collapsed');
+            toggle.classList.toggle('collapsed');
+        }
+        
+        // Lighten a hex color by a percentage
+        function lightenColor(hex, percent) {
+            const num = parseInt(hex.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = Math.min(255, (num >> 16) + amt);
+            const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+            const B = Math.min(255, (num & 0x0000FF) + amt);
+            return '#' + (0x1000000 + (R << 16) + (G << 8) + B).toString(16).slice(1);
+        }
+        
+        // Initialize all collapsible sections
+        function initializeCollapsibleSections(startCollapsed = true) {
+            const sections = document.querySelectorAll('.collapsible-section');
+            sections.forEach(section => {
+                const header = section.querySelector('.collapsible-header');
+                const content = section.querySelector('.collapsible-content');
+                const toggle = section.querySelector('.collapsible-toggle');
+                
+                if (header && !header.onclick) {
+                    header.onclick = function() {
+                        toggleSection(this);
+                    };
+                }
+                
+                // Set initial state to collapsed if specified
+                if (startCollapsed && content && toggle) {
+                    content.classList.add('collapsed');
+                    toggle.classList.add('collapsed');
+                }
+            });
+        }
+        
+        // Parse HTML content into sections
+        function parseContentIntoSections(htmlContent) {
+            const sections = [];
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlContent;
+            
+            const collapsibleSections = tempDiv.querySelectorAll('.collapsible-section');
+            
+            if (collapsibleSections.length > 0) {
+                collapsibleSections.forEach(section => {
+                    const header = section.querySelector('.collapsible-header h2, .collapsible-header h3');
+                    const content = section.querySelector('.collapsible-content');
+                    
+                    if (header && content) {
+                        sections.push({
+                            title: header.textContent,
+                            content: content.innerHTML
+                        });
+                    }
+                });
+            } else {
+                // If no collapsible sections, create one default section
+                sections.push({
+                    title: 'Main Content',
+                    content: htmlContent || '<p>Add your content here...</p>'
+                });
+            }
+            
+            return sections;
+        }
+        
+        // Convert HTML to plain text for editor
+        function htmlToPlainText(html) {
+            if (!html) return '';
+            let text = html
+                .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+                .replace(/<\s*\/p\s*>/gi, '\n\n')
+                .replace(/<\s*li\s*>/gi, '• ')
+                .replace(/<\s*\/li\s*>/gi, '\n')
+                .replace(/<\s*\/?ul\s*>/gi, '\n')
+                .replace(/<\s*\/?ol\s*>/gi, '\n');
+
+            text = text.replace(/<[^>]+>/g, '');
+
+            const div = document.createElement('div');
+            div.innerHTML = text;
+            text = div.textContent || '';
+
+            return text.replace(/\n{3,}/g, '\n\n').trim();
+        }
+
+        // Create section block in editor
+        function createSectionBlock(title, content, index) {
+            const block = document.createElement('div');
+            block.className = 'section-block';
+            block.dataset.index = index;
+
+            const plainContent = htmlToPlainText(content);
+            
+            block.innerHTML = `
+                <div class="section-block-header">
+                    <input type="text" class="section-title-input" value="${escapeHtml(title)}" placeholder="Section Title">
+                    <div class="section-controls">
+                        <button class="move-section-btn" onclick="moveSectionUp(${index})" title="Move Up">⬆️</button>
+                        <button class="move-section-btn" onclick="moveSectionDown(${index})" title="Move Down">⬇️</button>
+                        <button class="remove-section-btn" onclick="removeSectionBlock(${index})">🗑️</button>
+                    </div>
+                </div>
+                <textarea class="section-content-input" placeholder="Add your content here...\n\nYou can use:\n• Multiple paragraphs\n• Bullet points\n• Line breaks">${escapeHtml(plainContent)}</textarea>
+            `;
+            
+            return block;
+        }
+        
+        // Add a new section block
+        function addSectionBlock(title = '', content = '') {
+            const editor = document.getElementById('sectionEditor');
+            const index = editor.children.length;
+            const block = createSectionBlock(title || 'New Section', content || '<p>Add your content here...</p>', index);
+            editor.appendChild(block);
+        }
+        
+        // Move section up
+        function moveSectionUp(index) {
+            if (index === 0) return; // Already at top
+            
+            const editor = document.getElementById('sectionEditor');
+            const blocks = Array.from(editor.querySelectorAll('.section-block'));
+            
+            // Swap with previous block
+            const currentBlock = blocks[index];
+            const previousBlock = blocks[index - 1];
+            
+            editor.insertBefore(currentBlock, previousBlock);
+            updateSectionIndices();
+        }
+        
+        // Move section down
+        function moveSectionDown(index) {
+            const editor = document.getElementById('sectionEditor');
+            const blocks = Array.from(editor.querySelectorAll('.section-block'));
+            
+            if (index === blocks.length - 1) return; // Already at bottom
+            
+            // Swap with next block
+            const currentBlock = blocks[index];
+            const nextBlock = blocks[index + 1];
+            
+            editor.insertBefore(nextBlock, currentBlock);
+            updateSectionIndices();
+        }
+        
+        // Remove a section block
+        function removeSectionBlock(index) {
+            const editor = document.getElementById('sectionEditor');
+            const blocks = editor.querySelectorAll('.section-block');
+            
+            if (blocks.length <= 1) {
+                alert('You must have at least one section.');
+                return;
+            }
+            
+            if (confirm('Remove this section?')) {
+                blocks[index].remove();
+                // Reindex remaining blocks
+                updateSectionIndices();
+            }
+        }
+        
+        // Update section indices after removal or move
+        function updateSectionIndices() {
+            const editor = document.getElementById('sectionEditor');
+            const blocks = editor.querySelectorAll('.section-block');
+            blocks.forEach((block, index) => {
+                block.dataset.index = index;
+                
+                // Update button onclick handlers
+                const moveUpBtn = block.querySelectorAll('.move-section-btn')[0];
+                const moveDownBtn = block.querySelectorAll('.move-section-btn')[1];
+                const removeBtn = block.querySelector('.remove-section-btn');
+                
+                moveUpBtn.onclick = () => moveSectionUp(index);
+                moveDownBtn.onclick = () => moveSectionDown(index);
+                removeBtn.onclick = () => removeSectionBlock(index);
+                
+                // Disable up button on first item, down button on last item
+                moveUpBtn.disabled = (index === 0);
+                moveDownBtn.disabled = (index === blocks.length - 1);
+            });
+        }
+        
+        // Escape HTML for safe display
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Unescape HTML
+        function unescapeHtml(html) {
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            return div.textContent;
+        }
+        
+        // Toggle content editing
+        function toggleContentEdit() {
+            isEditingContent = true;
+            const contentDiv = document.getElementById('locationContent');
+            const editorDiv = document.getElementById('contentEditor');
+            const sectionEditor = document.getElementById('sectionEditor');
+            const editBtn = document.getElementById('editToggleBtn');
+            
+            // Store original content
+            originalContent = locationContents[currentLocationId] || '';
+            
+            // Parse content into sections
+            const sections = parseContentIntoSections(originalContent);
+            
+            // Clear section editor
+            sectionEditor.innerHTML = '';
+            
+            // Create section blocks
+            if (sections.length === 0) {
+                const locationName = document.getElementById('modalTitle').textContent;
+                addSectionBlock('About ' + locationName, '<p>Add your content here...</p>');
+            } else {
+                sections.forEach((section, index) => {
+                    sectionEditor.appendChild(createSectionBlock(section.title, section.content, index));
+                });
+            }
+            
+            contentDiv.style.display = 'none';
+            editorDiv.style.display = 'block';
+            editBtn.style.display = 'none';
+        }
+        
+        // Rich text editor formatting function
+        function formatDoc(command, value = null) {
+            document.execCommand(command, false, value);
+            document.getElementById('contentTextarea').focus();
+        }
+        
+        // Insert table
+        function insertTable() {
+            const rows = prompt('Number of rows:', '3');
+            const cols = prompt('Number of columns:', '3');
+            
+            if (rows && cols && rows > 0 && cols > 0) {
+                let tableHTML = '<table border="1" cellpadding="10" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 15px 0; border: 1px solid #555;">';
+                
+                // Header row
+                tableHTML += '<thead><tr>';
+                for (let j = 0; j < cols; j++) {
+                    tableHTML += '<th style="background-color: #3a3a3a; color: #ffd700; padding: 10px; border: 1px solid #555;">Header ' + (j + 1) + '</th>';
+                }
+                tableHTML += '</tr></thead><tbody>';
+                
+                // Data rows
+                for (let i = 0; i < rows - 1; i++) {
+                    tableHTML += '<tr>';
+                    for (let j = 0; j < cols; j++) {
+                        tableHTML += '<td style="padding: 10px; border: 1px solid #555;">Cell</td>';
+                    }
+                    tableHTML += '</tr>';
+                }
+                
+                tableHTML += '</tbody></table>';
+                formatDoc('insertHTML', tableHTML);
+            }
+        }
+        
+        // Insert link
+        function insertLink() {
+            const url = prompt('Enter URL:', 'https://');
+            if (url) {
+                formatDoc('createLink', url);
+            }
+        }
+        
+        // Save location content
+        function saveLocationContent() {
+            const sectionEditor = document.getElementById('sectionEditor');
+            const blocks = sectionEditor.querySelectorAll('.section-block');
+            
+            if (blocks.length === 0) {
+                alert('Please add at least one section.');
+                return;
+            }
+            
+            // Build HTML from section blocks
+            let fullHTML = '';
+            blocks.forEach(block => {
+                const titleInput = block.querySelector('.section-title-input');
+                const contentTextarea = block.querySelector('.section-content-input');
+                
+                const title = titleInput.value.trim() || 'Untitled Section';
+                const content = contentTextarea.value.trim() || '<p>No content</p>';
+                
+                // Convert plain text to HTML paragraphs
+                const htmlContent = convertTextToHTML(content);
+                
+                fullHTML += `
+                    <div class="collapsible-section">
+                        <div class="collapsible-header" onclick="toggleSection(this)">
+                            <h3>${escapeHtml(title)}</h3>
+                            <span class="collapsible-toggle">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            ${htmlContent}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Save to storage
+            locationContents[currentLocationId] = fullHTML;
+            saveContentsToStorage();
+            
+            // Update display
+            const contentDiv = document.getElementById('locationContent');
+            contentDiv.innerHTML = fullHTML;
+            
+            // Reinitialize collapsible sections (collapsed by default)
+            initializeCollapsibleSections(true);
+            
+            // Exit edit mode
+            cancelContentEdit();
+            
+            alert('Content saved successfully!');
+        }
+        
+        // Convert plain text to HTML
+        function convertTextToHTML(text) {
+            // Check if it already looks like HTML
+            if (text.trim().startsWith('<')) {
+                return text;
+            }
+            
+            // Split by double line breaks for paragraphs
+            const paragraphs = text.split('\n\n');
+            let html = '';
+            
+            paragraphs.forEach(para => {
+                para = para.trim();
+                if (!para) return;
+                
+                // Check for bullet points
+                if (para.includes('\n•') || para.startsWith('•')) {
+                    const items = para.split('\n').filter(line => line.trim());
+                    html += '<ul>';
+                    items.forEach(item => {
+                        item = item.trim().replace(/^[•\-\*]\s*/, '');
+                        if (item) html += `<li>${escapeHtml(item)}</li>`;
+                    });
+                    html += '</ul>';
+                } else {
+                    // Regular paragraph - preserve line breaks
+                    const lines = para.split('\n').map(line => escapeHtml(line.trim())).filter(line => line);
+                    html += '<p>' + lines.join('<br>') + '</p>';
+                }
+            });
+            
+            return html || '<p>No content</p>';
+        }
+        
+        // Cancel content editing
+        function cancelContentEdit() {
+            isEditingContent = false;
+            const contentDiv = document.getElementById('locationContent');
+            const editorDiv = document.getElementById('contentEditor');
+            const editBtn = document.getElementById('editToggleBtn');
+            
+            contentDiv.style.display = 'block';
+            editorDiv.style.display = 'none';
+            editBtn.style.display = 'block';
+        }
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('locationModal').classList.contains('active')) {
+                closeLocationModal();
+            }
+        });
+        
+        // Close modal when clicking outside
+        document.getElementById('locationModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLocationModal();
+            }
+        });
+
+        // Toggle sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.querySelector('.sidebar-toggle');
+            const zoomControls = document.querySelector('.zoom-controls');
+            
+            sidebar.classList.toggle('open');
+            toggleBtn.classList.toggle('sidebar-open');
+            zoomControls.classList.toggle('sidebar-open');
+        }
+
+        // Toggle edit mode
+        function toggleEditMode() {
+            editMode = !editMode;
+            const btn = document.getElementById('editModeBtn');
+            
+            if (editMode) {
+                btn.textContent = 'Exit Edit Mode';
+                btn.classList.add('edit-mode-active');
+            } else {
+                btn.textContent = 'Enable Edit Mode';
+                btn.classList.remove('edit-mode-active');
+                document.getElementById('addLandmarkSection').style.display = 'none';
+            }
+        }
+
+        // Initialize zoom to fit viewport
+        function initializeZoom() {
+            const viewport = document.getElementById('mapViewport');
+            const img = document.getElementById('mapImage');
+            
+            // Wait for image to load
+            if (img.naturalWidth === 0) {
+                img.onload = () => {
+                    setInitialZoom();
+                };
+            } else {
+                setInitialZoom();
+            }
+        }
+        
+        function setInitialZoom() {
+            const viewport = document.getElementById('mapViewport');
+            const img = document.getElementById('mapImage');
+            
+            const viewportWidth = viewport.clientWidth;
+            const viewportHeight = viewport.clientHeight;
+            const imgWidth = img.naturalWidth;
+            const imgHeight = img.naturalHeight;
+            
+            // Calculate zoom to fit viewport
+            const scaleX = viewportWidth / imgWidth;
+            const scaleY = viewportHeight / imgHeight;
+            currentZoom = Math.min(scaleX, scaleY) * 0.95; // 95% to add some padding
+            
+            // Center the image
+            translateX = (viewportWidth - imgWidth * currentZoom) / 2;
+            translateY = (viewportHeight - imgHeight * currentZoom) / 2;
+            
+            applyTransform();
+        }
+        
+        // Zoom functions
+        function zoomIn() {
+            const viewport = document.getElementById('mapViewport');
+            const rect = viewport.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            zoomAtPoint(centerX, centerY, zoomStep);
+        }
+        
+        function zoomOut() {
+            const viewport = document.getElementById('mapViewport');
+            const rect = viewport.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            zoomAtPoint(centerX, centerY, -zoomStep);
+        }
+        
+        function resetZoom() {
+            setInitialZoom();
+        }
+        
+        function zoomAtPoint(mouseX, mouseY, delta) {
+            // Calculate mouse position relative to the image before zoom
+            const beforeZoomX = (mouseX - translateX) / currentZoom;
+            const beforeZoomY = (mouseY - translateY) / currentZoom;
+            
+            // Calculate new zoom level
+            const newZoom = Math.min(maxZoom, Math.max(minZoom, currentZoom + delta));
+            
+            // Always apply the new zoom even if it's the same (helps with edge cases)
+            // Calculate new translate to keep mouse position fixed
+            translateX = mouseX - beforeZoomX * newZoom;
+            translateY = mouseY - beforeZoomY * newZoom;
+            currentZoom = newZoom;
+            
+            applyTransform();
+        }
+        
+        function applyTransform() {
+            const mapContainer = document.getElementById('mapContainer');
+            mapContainer.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+        }
+        
+        // Mouse wheel zoom
+        document.getElementById('mapViewport').addEventListener('wheel', function(e) {
+            e.preventDefault();
+            
+            const rect = this.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Adjust zoom based on wheel direction - use larger step for more responsive zooming
+            const delta = e.deltaY > 0 ? -zoomStep : zoomStep;
+            zoomAtPoint(mouseX, mouseY, delta);
+        }, { passive: false });
+        
+        // Panning functionality
+        const viewport = document.getElementById('mapViewport');
+        
+        viewport.addEventListener('mousedown', function(e) {
+            if (e.target.classList.contains('landmark-dot')) return;
+            isPanning = true;
+            startX = e.clientX - translateX;
+            startY = e.clientY - translateY;
+        });
+        
+        viewport.addEventListener('mousemove', function(e) {
+            if (!isPanning) return;
+            e.preventDefault();
+            translateX = e.clientX - startX;
+            translateY = e.clientY - startY;
+            applyTransform();
+        });
+        
+        viewport.addEventListener('mouseup', function() {
+            isPanning = false;
+        });
+        
+        viewport.addEventListener('mouseleave', function() {
+            isPanning = false;
+        });
+
+        // Touch panning (single finger)
+        viewport.addEventListener('touchstart', function(e) {
+            if (e.target.classList.contains('landmark-dot')) return;
+            if (e.touches.length !== 1) return;
+            isPanning = true;
+            const touch = e.touches[0];
+            startX = touch.clientX - translateX;
+            startY = touch.clientY - translateY;
+        }, { passive: true });
+
+        viewport.addEventListener('touchmove', function(e) {
+            if (!isPanning || e.touches.length !== 1) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            translateX = touch.clientX - startX;
+            translateY = touch.clientY - startY;
+            applyTransform();
+        }, { passive: false });
+
+        viewport.addEventListener('touchend', function() {
+            isPanning = false;
+        }, { passive: true });
+
+        // Handle map clicks in edit mode
+        viewport.addEventListener('click', function(e) {
+            if (!editMode || isPanning) return;
+            if (e.target.classList.contains('landmark-dot')) return;
+            
+            const img = document.getElementById('mapImage');
+            const rect = img.getBoundingClientRect();
+            
+            // Check if click is within image bounds
+            if (e.clientX < rect.left || e.clientX > rect.right ||
+                e.clientY < rect.top || e.clientY > rect.bottom) {
+                return;
+            }
+            
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            
+            tempClickPosition = { x: x.toFixed(2), y: y.toFixed(2) };
+            
+            document.getElementById('clickPosition').textContent = 
+                `X: ${tempClickPosition.x}%, Y: ${tempClickPosition.y}%`;
+            document.getElementById('addLandmarkSection').style.display = 'block';
+            document.getElementById('landmarkName').focus();
+        });
+
+        // Save a new landmark
+        function saveLandmark() {
+            const name = document.getElementById('landmarkName').value.trim();
+            const reference = document.getElementById('documentPage').value.trim();
+            const color = document.getElementById('landmarkColor').value;
+            
+            if (!name || !reference || !tempClickPosition) {
+                alert('Please fill in all fields and click on the map first.');
+                return;
+            }
+            
+            // Check if reference ID already exists
+            const existingLandmark = landmarks.find(l => l.reference === reference);
+            if (existingLandmark) {
+                alert('A landmark with this ID already exists. Please use a unique ID.');
+                return;
+            }
+            
+            landmarks.push({
+                name: name,
+                x: tempClickPosition.x,
+                y: tempClickPosition.y,
+                reference: reference,
+                color: color
+            });
+            
+            saveLandmarksToStorage();
+            renderLandmarks();
+            
+            // Reset form
+            document.getElementById('landmarkName').value = '';
+            document.getElementById('documentPage').value = '';
+            document.getElementById('landmarkColor').value = '#ff4444';
+            document.getElementById('addLandmarkSection').style.display = 'none';
+            tempClickPosition = null;
+            
+            alert('Landmark added successfully! Click on it to add content.');
+        }
+
+        // Cancel adding landmark
+        function cancelLandmark() {
+            document.getElementById('landmarkName').value = '';
+            document.getElementById('documentPage').value = '';
+            document.getElementById('landmarkColor').value = '#ff4444';
+            document.getElementById('addLandmarkSection').style.display = 'none';
+            tempClickPosition = null;
+        }
+        
+        // Edit landmark color
+        function editLandmarkColor(locationId) {
+            const landmark = landmarks.find(l => l.reference === locationId);
+            if (!landmark) return;
+            
+            // Create a temporary color input
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = landmark.color || '#ff4444';
+            colorInput.style.display = 'none';
+            document.body.appendChild(colorInput);
+            
+            colorInput.onchange = function() {
+                landmark.color = this.value;
+                saveLandmarksToStorage();
+                renderLandmarks();
+                document.body.removeChild(this);
+            };
+            
+            colorInput.onclick = function(e) {
+                e.stopPropagation();
+            };
+            
+            colorInput.click();
+        }
+        
+        // Delete current location from modal
+        function deleteCurrentLocation() {
+            if (!currentLocationId) return;
+            
+            const landmark = landmarks.find(l => l.reference === currentLocationId);
+            if (!landmark) return;
+            
+            if (!confirm(`Are you sure you want to delete "${landmark.name}"?\n\nThis will remove the landmark and all its content permanently.`)) {
+                return;
+            }
+            
+            deleteLandmark(currentLocationId);
+            closeLocationModal();
+        }
+        
+        // Delete a landmark by ID
+        function deleteLandmark(locationId) {
+            // Find the landmark
+            const index = landmarks.findIndex(l => l.reference === locationId);
+            if (index === -1) return;
+            
+            const landmarkName = landmarks[index].name;
+            
+            // Remove from array
+            landmarks.splice(index, 1);
+            
+            // Remove content
+            delete locationContents[locationId];
+            
+            // Save to storage
+            saveLandmarksToStorage();
+            saveContentsToStorage();
+            
+            // Re-render
+            renderLandmarks();
+            
+            alert(`"${landmarkName}" has been deleted.`);
+        }
+
+        // Load all data when page loads
+        window.onload = function() {
+            loadAllMapsData();
+            initializeZoom();
+        };
+    </script>
+</body>
+</html>
